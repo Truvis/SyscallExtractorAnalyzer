@@ -1,6 +1,8 @@
 # SyscallExtractorAnalyzer
 This script will pull and analyze syscalls in given application(s) allowing for easier security research purposes
 
+![2021-03-05 11_53_02-root@centos8gen_~](https://user-images.githubusercontent.com/23244379/110147248-73c27180-7da9-11eb-9aa3-ffce47786c6a.png)
+
 ## Gaols
 - Multithreading support for faster processing
 - Syscalls for other OSes and types
