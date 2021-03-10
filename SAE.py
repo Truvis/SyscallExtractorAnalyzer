@@ -1,5 +1,5 @@
 import os
-import subprocess
+import multiprocessing
 
 class StatusMessage:
     def __init__(self, a=None, b=None, c=None, d=None):
@@ -77,6 +77,7 @@ SysCall64List = ['read','write','open','close','stat','fstat','lstat','poll','ls
 FoundInList = []
 FilePath = '/root/test'
 suffix = '.LOG'
+Threads = 4
 
 def common_elements(list1, list2):
     result = []
@@ -88,22 +89,16 @@ def common_elements(list1, list2):
 #
 # dump syscalls to log files from loaded files
 #
-def syscall_finder():
-    sm.p_msg('=== STARTING SYSCALL FINDER ===', 'notice', '1', 'y')
-    files = os.listdir(FilePath)
-    sm.p_msg('File Path: ' + FilePath, 'notice', '1', 'y')
-    sm.p_msg('===', 'notice', '1', 'y')
-    for file in files:
-        CURRENTLoadedFile = os.path.join(FilePath, file)
-        sm.p_msg('Loading File: ' + file, 'notice', '1', 'y')
-        os.system("strace "+CURRENTLoadedFile+" 2>&1 >/dev/null | grep -P -o '^[a-z]*(?=\()' | sort | uniq > "+CURRENTLoadedFile+".LOG")
-        sm.p_msg('File Scanned for SysCalls: ' + file, 'notice', '1', 'y')
+def syscall_finder(filename: str):
+    sm.p_msg('Loading File: ' + filename, 'notice', '1', 'y')
+    os.system("strace "+filename+" 2>&1 >/dev/null | grep -P -o '^[a-z]*(?=\()' | sort | uniq > "+filename+".LOG")
+    sm.p_msg('File Scanned for SysCalls: ' + filename, 'ok', '1', 'y')
 
 #
 # pull syscalls from the extracted files
 #
 def syscall_extractor():
-    sm.p_msg('=== STARTING SYSCALL EXTRACTOR ===', 'notice', '1', 'y')
+    sm.p_msg('=== STARTING SYSCALL EXTRACTOR ===', 'notice', '2', 'y')
     files = os.listdir(FilePath)
     sm.p_msg('File Path: ' + FilePath, 'notice', '1', 'y')
     sm.p_msg('===', 'notice', '1', 'y')
@@ -129,11 +124,16 @@ def syscall_extractor():
             os.remove(FilePath+"/"+file)
             print("\r")
     print("\r")
-    sm.p_msg('SysCalls in Common [Linux 64 Bit]:  ' + ' , '.join(map(str, FoundInList)), 'ok', '1', 'y')
+    sm.p_msg('SysCalls in Common [Linux 64 Bit]:  ' + ' , '.join(map(str, FoundInList)), 'ok', '2', 'y')
 
 #
 # run the application steps
 #
-syscall_finder()
-print("\r")
-syscall_extractor()
+if __name__ == "__main__":
+    sm.p_msg('=== STARTING SYSCALL FINDER ===', 'notice', '2', 'y')
+    sm.p_msg('File Path: ' + FilePath, 'notice', '1', 'y')
+    sm.p_msg('===', 'notice', '1', 'y')
+    with multiprocessing.Pool(Threads) as p:
+        p.map(syscall_finder,[os.path.join(FilePath, file) for file in os.listdir(FilePath)])
+    print("\r")
+    syscall_extractor()
