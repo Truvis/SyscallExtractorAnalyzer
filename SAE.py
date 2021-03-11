@@ -1,5 +1,7 @@
 import os
 import multiprocessing
+import argparse
+import sys
 
 class StatusMessage:
     def __init__(self, a=None, b=None, c=None, d=None):
@@ -77,7 +79,8 @@ SysCall64List = ['read','write','open','close','stat','fstat','lstat','poll','ls
 FoundInList = []
 FilePath = '/root/test'
 suffix = '.LOG'
-Threads = 4
+Threads = 1
+VERBOSE = "y"
 
 def common_elements(list1, list2):
     result = []
@@ -90,7 +93,7 @@ def common_elements(list1, list2):
 # dump syscalls to log files from loaded files
 #
 def syscall_finder(filename: str):
-    sm.p_msg('Loading File: ' + filename, 'notice', '1', 'y')
+    if VERBOSE == "y": sm.p_msg('Loading File: ' + filename, 'notice', '1', 'y')
     os.system("strace "+filename+" 2>&1 >/dev/null | grep -P -o '^[a-z]*(?=\()' | sort | uniq > "+filename+".LOG")
     sm.p_msg('File Scanned for SysCalls: ' + filename, 'ok', '1', 'y')
 
@@ -98,18 +101,13 @@ def syscall_finder(filename: str):
 # pull syscalls from the extracted files
 #
 def syscall_extractor():
-    sm.p_msg('=== STARTING SYSCALL EXTRACTOR ===', 'notice', '2', 'y')
-    files = os.listdir(FilePath)
-    sm.p_msg('File Path: ' + FilePath, 'notice', '1', 'y')
-    sm.p_msg('===', 'notice', '1', 'y')
-    print("\r")
     # LOAD list to our list to remove SysCalls as not found to build a common list
     FoundInList = SysCall64List
     for file in files:
         if file.endswith(".LOG"):
             SysCallsInFile = [] # set
             with open(os.path.join(FilePath, file), 'r') as CURRENTLoadedFile:
-                sm.p_msg('Pulling SysCalls from: ' + file.rsplit(".", 1)[0], 'notice', '1', 'y')
+                if VERBOSE == "y": sm.p_msg('Pulling SysCalls from: ' + file.rsplit(".", 1)[0], 'notice', '1', 'y')
                 ReadFile = CURRENTLoadedFile.read()
                 # Build a LIST of common SysCalls used by all the exploits.
                 # IF SysCall from FILE is NOT found in the current list, do not add it.
@@ -120,7 +118,7 @@ def syscall_extractor():
             FoundInList = common_elements(SysCallsInFile, FoundInList)
             sm.p_msg('SysCalls Used In ' + file.rsplit(".", 1)[0] + ' : ' + ' , '.join(map(str, SysCallsInFile)), 'ok', '1', 'y')
             CURRENTLoadedFile.close()
-            sm.p_msg('Remove File: ' + file, 'notice', '1', 'y')
+            if VERBOSE == "y": sm.p_msg('Remove File: ' + file, 'notice', '1', 'y')
             os.remove(FilePath+"/"+file)
             print("\r")
     print("\r")
@@ -129,11 +127,40 @@ def syscall_extractor():
 #
 # run the application steps
 #
+
+def readOptions(args=sys.argv[1:]):
+    parser = argparse.ArgumentParser(description="The parsing commands lists.")
+    parser.add_argument("-t", "--threads", default=1, help="Number of threads to use")
+    parser.add_argument("-f", "--filepath", required=True, help="File path")
+    parser.add_argument("-v", "--verbose", default="n", help="Verbose mode y/n")
+    opts = parser.parse_args(args)
+    return opts
+
 if __name__ == "__main__":
-    sm.p_msg('=== STARTING SYSCALL FINDER ===', 'notice', '2', 'y')
-    sm.p_msg('File Path: ' + FilePath, 'notice', '1', 'y')
-    sm.p_msg('===', 'notice', '1', 'y')
-    with multiprocessing.Pool(Threads) as p:
-        p.map(syscall_finder,[os.path.join(FilePath, file) for file in os.listdir(FilePath)])
+    options = readOptions(sys.argv[1:])
+    Threads = options.threads
+    VERBOSE = options.verbose
+    FilePath = options.filepath
+
+    if not os.path.isdir(FilePath):
+        sm.p_msg('The path specified does not exist', 'fail', '1', 'y')
+        sys.exit(2)
+    if FilePath is None:
+        sm.p_msg('-f/--filepath must be set', 'fail', '1', 'y')
+        sys.exit(2)
+
+    if VERBOSE == "y": sm.p_msg('Threads:' + str(Threads), 'notice', '1', 'y')
+    if VERBOSE == "y": sm.p_msg('Verbose:' + VERBOSE, 'notice', '1', 'y')
+    print("\r")
+    if VERBOSE == "y": sm.p_msg('=== STARTING SYSCALL FINDER ===', 'notice', '2', 'y')
+    if VERBOSE == "y": sm.p_msg('File Path: ' + FilePath, 'notice', '1', 'y')
+    if VERBOSE == "y": sm.p_msg('===', 'notice', '1', 'y')
+    with multiprocessing.Pool(int(Threads)) as p:
+        p.map(syscall_finder, [os.path.join(FilePath, file) for file in os.listdir(FilePath)])
+    print("\r")
+    if VERBOSE == "y": sm.p_msg('=== STARTING SYSCALL EXTRACTOR ===', 'notice', '2', 'y')
+    files = os.listdir(FilePath)
+    if VERBOSE == "y": sm.p_msg('File Path: ' + FilePath, 'notice', '1', 'y')
+    if VERBOSE == "y": sm.p_msg('===', 'notice', '1', 'y')
     print("\r")
     syscall_extractor()
